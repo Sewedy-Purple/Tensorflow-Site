@@ -1,0 +1,1003 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Train and chat with a tiny transformer LLM entirely in your browser using TensorFlow.js. No server, no install.">
+<meta name="theme-color" content="#0a0a0a">
+<title>tf.js LLM lab</title>
+<style>
+:root{
+  color-scheme:light dark;
+  --bg:light-dark(#fafafa,#0a0a0a);
+  --surface:light-dark(#fff,#141414);
+  --surface-2:light-dark(#f3f3f3,#1c1c1c);
+  --border:light-dark(#e5e5e5,#2a2a2a);
+  --text:light-dark(#1a1a1a,#e8e8e8);
+  --text-dim:light-dark(#666,#888);
+  --accent:light-dark(#0066cc,#4a9eff);
+  --success:light-dark(#0a7b3e,#4caf50);
+  --error:light-dark(#c41818,#f44336);
+  --warning:light-dark(#a35200,#ff9800);
+  --mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+  --sans:system-ui,-apple-system,'Segoe UI',sans-serif;
+  --s1:4px;--s2:8px;--s3:12px;--s4:16px;--s6:24px;--s8:32px;
+  --r:6px;
+  --dur:120ms;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font:14px/1.5 var(--sans);
+  background:var(--bg);color:var(--text);
+  min-height:100vh;
+  display:flex;flex-direction:column;
+}
+header{
+  border-bottom:1px solid var(--border);
+  padding:var(--s3) var(--s4);
+  display:flex;align-items:center;gap:var(--s4);
+  background:var(--surface);
+  position:sticky;top:0;z-index:10;
+}
+header h1{font-size:15px;font-weight:600;margin:0;letter-spacing:-.01em}
+header h1 span{color:var(--text-dim);font-weight:400}
+nav{margin-left:auto;display:flex;gap:var(--s1)}
+nav button{
+  background:transparent;border:1px solid transparent;color:var(--text-dim);
+  padding:var(--s1) var(--s3);border-radius:var(--r);
+  font:inherit;cursor:pointer;transition:all var(--dur);
+}
+nav button[aria-selected="true"]{
+  background:var(--surface-2);border-color:var(--border);color:var(--text);
+}
+nav button:hover:not([aria-selected="true"]){color:var(--text)}
+main{
+  flex:1;max-width:900px;width:100%;margin:0 auto;
+  padding:var(--s6) var(--s4);
+}
+section[hidden]{display:none}
+fieldset{
+  border:1px solid var(--border);border-radius:var(--r);
+  padding:var(--s4);margin:0 0 var(--s4);
+  background:var(--surface);
+}
+legend{
+  padding:0 var(--s2);font-size:12px;font-weight:600;
+  text-transform:uppercase;letter-spacing:.05em;color:var(--text-dim);
+}
+label{
+  display:flex;align-items:center;gap:var(--s2);
+  font-size:13px;margin-bottom:var(--s2);
+}
+label input[type="range"]{flex:1;accent-color:var(--accent)}
+label input[type="number"]{width:100px}
+label output{
+  font-family:var(--mono);font-size:12px;color:var(--text-dim);
+  min-width:3ch;text-align:right;
+}
+input,textarea,select,button{
+  font:inherit;color:inherit;background:var(--surface-2);
+  border:1px solid var(--border);border-radius:var(--r);
+  padding:var(--s2) var(--s3);
+}
+input:focus-visible,textarea:focus-visible,select:focus-visible,button:focus-visible{
+  outline:2px solid var(--accent);outline-offset:2px;
+}
+textarea{width:100%;resize:vertical;font-family:var(--mono);font-size:12px}
+button{cursor:pointer;transition:all var(--dur)}
+button:hover:not(:disabled){background:var(--border)}
+button:disabled{opacity:.5;cursor:not-allowed}
+button.primary{
+  background:var(--accent);color:#fff;border-color:var(--accent);
+}
+button.primary:hover:not(:disabled){filter:brightness(1.1);background:var(--accent)}
+button.danger{color:var(--error);border-color:var(--error)}
+.source-tabs{display:flex;gap:var(--s1);margin-bottom:var(--s2)}
+.source-tabs button{
+  background:transparent;border:1px solid var(--border);
+  padding:var(--s1) var(--s3);font-size:12px;
+}
+.source-tabs button[aria-selected="true"]{
+  background:var(--surface-2);border-color:var(--accent);color:var(--accent);
+}
+.source-panel{margin-bottom:var(--s2)}
+.source-panel[hidden]{display:none}
+.hint{font-size:12px;color:var(--text-dim);margin:var(--s1) 0 0}
+.stats{
+  font-family:var(--mono);font-size:12px;color:var(--text-dim);
+  padding:var(--s2) 0;min-height:1.5em;
+}
+.stats.warn{color:var(--warning)}
+.stats.error{color:var(--error)}
+.actions{display:flex;gap:var(--s2);margin:var(--s3) 0}
+.status{
+  font-family:var(--mono);font-size:12px;
+  min-height:1.5em;padding:var(--s2) 0;
+}
+.status.running{color:var(--accent)}
+.status.complete{color:var(--success)}
+.status.error{color:var(--error)}
+#loss-chart{
+  width:100%;height:180px;display:block;
+  background:var(--surface-2);border:1px solid var(--border);
+  border-radius:var(--r);margin-top:var(--s2);
+}
+#saved-models{
+  display:flex;flex-direction:column;gap:var(--s2);
+  margin-bottom:var(--s3);
+}
+.model-row{
+  display:flex;align-items:center;gap:var(--s2);
+  padding:var(--s2) var(--s3);
+  background:var(--surface-2);border-radius:var(--r);
+  font-size:13px;
+}
+.model-row .name{flex:1;font-family:var(--mono)}
+.model-row .date{color:var(--text-dim);font-size:12px}
+.model-row button{font-size:12px;padding:var(--s1) var(--s2)}
+#panel-chat{display:flex;flex-direction:column;height:calc(100vh - 200px);min-height:400px}
+#chat-log{
+  flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:var(--s3);
+  padding:var(--s4);background:var(--surface);
+  border:1px solid var(--border);border-radius:var(--r);margin-bottom:var(--s3);
+}
+.message{
+  max-width:80%;padding:var(--s2) var(--s3);border-radius:var(--r);
+  word-wrap:break-word;white-space:pre-wrap;font-family:var(--mono);font-size:13px;
+}
+.message.user{align-self:flex-end;background:var(--accent);color:#fff}
+.message.assistant{align-self:flex-start;background:var(--surface-2)}
+.message.system{
+  align-self:center;background:transparent;color:var(--text-dim);
+  font-family:var(--sans);font-size:12px;text-align:center;
+}
+#chat-form{display:flex;gap:var(--s2);margin-bottom:var(--s2)}
+#chat-form input{flex:1}
+.chat-controls{
+  display:flex;gap:var(--s3);align-items:center;flex-wrap:wrap;
+  padding-top:var(--s2);border-top:1px solid var(--border);
+}
+.chat-controls label{margin:0;font-size:12px}
+.chat-controls label input[type="range"]{width:100px}
+@media(max-width:600px){
+  main{padding:var(--s3) var(--s2)}
+  .chat-controls{font-size:12px}
+  .chat-controls label input[type="range"]{width:70px}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>tf.js LLM lab <span>— browser-native training</span></h1>
+  <nav role="tablist">
+    <button role="tab" aria-selected="true" data-tab="train">Train</button>
+    <button role="tab" aria-selected="false" data-tab="chat">Chat</button>
+  </nav>
+</header>
+
+<main>
+  <section id="panel-train" role="tabpanel">
+    <fieldset>
+      <legend>1. Dataset</legend>
+      <div class="source-tabs" role="tablist">
+        <button role="tab" aria-selected="true" data-source="paste">Paste text</button>
+        <button role="tab" aria-selected="false" data-source="file">Upload file</button>
+        <button role="tab" aria-selected="false" data-source="url">Fetch URL</button>
+      </div>
+      <div class="source-panel" data-source-panel="paste">
+        <textarea id="dataset-text" rows="6" placeholder="Paste 100+ characters of training text…" aria-label="Training text"></textarea>
+      </div>
+      <div class="source-panel" data-source-panel="file" hidden>
+        <input type="file" id="dataset-file" accept=".txt,.json,.csv,.md" aria-label="Training file">
+      </div>
+      <div class="source-panel" data-source-panel="url" hidden>
+        <div style="display:flex;gap:8px">
+          <input type="url" id="dataset-url" placeholder="https://example.com/text.txt" style="flex:1" aria-label="Dataset URL">
+          <button id="fetch-url">Fetch</button>
+        </div>
+        <p class="hint">Only CORS-permissive URLs work (e.g. raw.githubusercontent.com). Most academic dataset hosts block browser fetches — download the file and use Upload instead.</p>
+      </div>
+      <div class="stats" id="dataset-stats"></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>2. Model</legend>
+      <label>Layers <input type="range" id="nLayer" min="1" max="6" value="2" step="1"><output>2</output></label>
+      <label>Heads <input type="range" id="nHead" min="1" max="8" value="4" step="1"><output>4</output></label>
+      <label>Embed dim <input type="range" id="nEmbed" min="32" max="256" value="64" step="32"><output>64</output></label>
+      <label>Block size <input type="range" id="blockSize" min="16" max="128" value="64" step="16"><output>64</output></label>
+      <label>Batch size <input type="range" id="batchSize" min="4" max="32" value="8" step="4"><output>8</output></label>
+      <div class="stats" id="model-estimate"></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>3. Training</legend>
+      <label>Steps <input type="number" id="steps" min="10" max="10000" value="300" step="10"></label>
+      <label>Learning rate <input type="number" id="lr" min="0.0001" max="0.01" value="0.003" step="0.0001"></label>
+      <div class="actions">
+        <button id="start-train" class="primary">Start training</button>
+        <button id="pause-train" hidden>Pause</button>
+        <button id="stop-train" hidden>Stop</button>
+      </div>
+      <div class="status" id="train-status" role="status" aria-live="polite"></div>
+      <canvas id="loss-chart" width="800" height="180" aria-label="Loss chart"></canvas>
+    </fieldset>
+
+    <fieldset>
+      <legend>4. Saved models</legend>
+      <div id="saved-models"><span class="hint">No saved models yet.</span></div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <input type="text" id="save-name" placeholder="model-name" style="flex:1" aria-label="Model name">
+        <button id="save-model" disabled>Save current</button>
+      </div>
+      <p class="hint">Models are stored in IndexedDB. Browsers may evict them under disk pressure — download a copy to keep forever.</p>
+    </fieldset>
+  </section>
+
+  <section id="panel-chat" role="tabpanel" hidden>
+    <div id="chat-log" role="log" aria-live="polite" aria-label="Chat log">
+      <div class="message system">Train or load a model first, then send a prompt.</div>
+    </div>
+    <form id="chat-form">
+      <input type="text" id="chat-input" placeholder="Prompt…" autocomplete="off" aria-label="Chat prompt" disabled>
+      <button type="submit" class="primary" id="send-btn" disabled>Send</button>
+    </form>
+    <div class="chat-controls">
+      <label>Temperature <input type="range" id="temperature" min="0.1" max="1.5" value="0.8" step="0.1"><output>0.8</output></label>
+      <label>Max tokens <input type="number" id="maxTokens" min="10" max="500" value="100" step="10" style="width:70px"></label>
+      <button id="clear-chat" style="margin-left:auto">Clear chat</button>
+    </div>
+  </section>
+</main>
+
+<script type="module">
+'use strict';
+
+const $ = (sel) => document.querySelector(sel);
+const $$ = (sel) => [...document.querySelectorAll(sel)];
+
+/* ---------------- worker source ---------------- */
+const WORKER_SRC = String.raw`
+'use strict';
+import * as tf from 'https://esm.sh/@tensorflow/tfjs@4.22.0';
+try { await import('https://esm.sh/@tensorflow/tfjs-backend-webgpu@4.22.0'); } catch (e) {}
+
+/* ---- custom multi-head self-attention layer ---- */
+class MultiHeadSelfAttention extends tf.layers.Layer {
+  static get className() { return 'MultiHeadSelfAttention'; }
+  constructor(config) {
+    super(config || {});
+    this.dModel = config.dModel;
+    this.numHeads = config.numHeads;
+    this.headDim = this.dModel / this.numHeads;
+  }
+  build(inputShape) {
+    this.qProj = tf.layers.dense({ units: this.dModel, useBias: true });
+    this.kProj = tf.layers.dense({ units: this.dModel, useBias: true });
+    this.vProj = tf.layers.dense({ units: this.dModel, useBias: true });
+    this.outProj = tf.layers.dense({ units: this.dModel, useBias: true });
+    super.build(inputShape);
+    return inputShape;
+  }
+  call(inputs, kwargs) {
+    const x = Array.isArray(inputs) ? inputs[0] : inputs;
+    const B = x.shape[0], T = x.shape[1];
+    const q = this.qProj.apply(x);
+    const k = this.kProj.apply(x);
+    const v = this.vProj.apply(x);
+    const toHeads = (t) =>
+      t.reshape([B, T, this.numHeads, this.headDim]).transpose([0, 2, 1, 3]);
+    const qh = toHeads(q), kh = toHeads(k), vh = toHeads(v);
+    const scores = tf.matMul(qh, kh, false, true).div(Math.sqrt(this.headDim));
+    const mask = tf.linalg.bandPart(tf.ones([T, T]), -1, 0).reshape([1, 1, T, T]);
+    const masked = scores.mul(mask).add(tf.scalar(1).sub(mask).mul(-1e9));
+    const w = tf.softmax(masked, -1);
+    const attn = tf.matMul(w, vh).transpose([0, 2, 1, 3]).reshape([B, T, this.dModel]);
+    return this.outProj.apply(attn);
+  }
+  computeOutputShape(inputShape) { return inputShape[0]; }
+  getConfig() { return { ...super.getConfig(), dModel: this.dModel, numHeads: this.numHeads }; }
+  static fromConfig(cls, config) { return new cls(config); }
+}
+tf.serialization.registerClass(MultiHeadSelfAttention);
+
+/* ---- state ---- */
+const S = {
+  model: null,
+  chars: null,
+  stoi: null,
+  blockSize: 0,
+  vocabSize: 0,
+  training: { paused: false, stopped: false, active: false },
+  backend: null,
+};
+
+async function initBackend() {
+  for (const b of ['webgpu', 'webgl', 'cpu']) {
+    try {
+      await tf.setBackend(b);
+      await tf.ready();
+      S.backend = tf.getBackend();
+      return S.backend;
+    } catch (e) {}
+  }
+  throw new Error('No TensorFlow.js backend available');
+}
+
+function buildTokenizer(text) {
+  const counts = new Map();
+  for (const c of text) counts.set(c, (counts.get(c) || 0) + 1);
+  const chars = [...counts.keys()].sort();
+  const stoi = new Map(chars.map((c, i) => [c, i]));
+  return { chars, stoi };
+}
+
+function buildModel({ vocabSize, blockSize, nEmbed, nHead, nLayer }) {
+  const tokIn = tf.input({ shape: [blockSize], dtype: 'int32', name: 'tokens' });
+  const posIn = tf.input({ shape: [blockSize], dtype: 'int32', name: 'positions' });
+  const tokEmb = tf.layers.embedding({ inputDim: vocabSize, outputDim: nEmbed, name: 'tokEmb' }).apply(tokIn);
+  const posEmb = tf.layers.embedding({ inputDim: blockSize, outputDim: nEmbed, name: 'posEmb' }).apply(posIn);
+  let x = tf.layers.add({ name: 'embAdd' }).apply([tokEmb, posEmb]);
+  for (let i = 0; i < nLayer; i++) {
+    const ln1 = tf.layers.layerNormalization({ epsilon: 1e-5, name: 'ln1_' + i }).apply(x);
+    const a = new MultiHeadSelfAttention({ dModel: nEmbed, numHeads: nHead, name: 'mha_' + i }).apply(ln1);
+    x = tf.layers.add({ name: 'res1_' + i }).apply([x, a]);
+    const ln2 = tf.layers.layerNormalization({ epsilon: 1e-5, name: 'ln2_' + i }).apply(x);
+    const ff = tf.layers.dense({ units: nEmbed * 4, activation: 'gelu', name: 'ff1_' + i }).apply(ln2);
+    const ff2 = tf.layers.dense({ units: nEmbed, name: 'ff2_' + i }).apply(ff);
+    x = tf.layers.add({ name: 'res2_' + i }).apply([x, ff2]);
+  }
+  const lnf = tf.layers.layerNormalization({ epsilon: 1e-5, name: 'lnf' }).apply(x);
+  const logits = tf.layers.dense({ units: vocabSize, useBias: false, name: 'head' }).apply(lnf);
+  return tf.model({ inputs: [tokIn, posIn], outputs: logits });
+}
+
+function sampleBatch(tokens, blockSize, batchSize) {
+  const maxStart = tokens.length - blockSize - 1;
+  const xs = new Array(batchSize), ys = new Array(batchSize);
+  for (let i = 0; i < batchSize; i++) {
+    const start = Math.floor(Math.random() * maxStart);
+    xs[i] = tokens.slice(start, start + blockSize);
+    ys[i] = tokens.slice(start + 1, start + blockSize + 1);
+  }
+  return {
+    x: tf.tensor2d(xs, [batchSize, blockSize], 'int32'),
+    y: tf.tensor2d(ys, [batchSize, blockSize], 'int32'),
+  };
+}
+
+async function train(cfg, postProgress) {
+  const { text, blockSize, batchSize, nEmbed, nHead, nLayer, steps, lr } = cfg;
+  if (text.length < blockSize * 4) throw new Error('Text too short for block size ' + blockSize);
+  const { chars, stoi } = buildTokenizer(text);
+  if (chars.length < 2) throw new Error('Dataset needs at least 2 unique characters');
+  const tokens = Array.from(text, c => stoi.get(c));
+
+  S.chars = chars; S.stoi = stoi; S.blockSize = blockSize; S.vocabSize = chars.length;
+  const model = buildModel({ vocabSize: chars.length, blockSize, nEmbed, nHead, nLayer });
+  S.model = model;
+
+  const optimizer = tf.train.adam(lr);
+  const varList = model.trainableWeights.map(w => w.val);
+  const positions = tf.tensor2d(
+    [Array.from({ length: blockSize }, (_, i) => i)],
+    [1, blockSize], 'int32'
+  );
+
+  S.training = { paused: false, stopped: false, active: true };
+  const t0 = performance.now();
+  let lastLoss = 0;
+
+  for (let step = 0; step < steps; step++) {
+    if (S.training.stopped) break;
+    while (S.training.paused && !S.training.stopped) {
+      await new Promise(r => setTimeout(r, 80));
+    }
+    if (S.training.stopped) break;
+
+    const { x, y } = sampleBatch(tokens, blockSize, batchSize);
+    const pos = positions.tile([batchSize, 1]);
+
+    const lossT = optimizer.minimize(() => {
+      const logits = model.apply([x, pos]);
+      const logitsFlat = logits.reshape([batchSize * blockSize, chars.length]);
+      const labels = tf.oneHot(y.reshape([batchSize * blockSize]), chars.length);
+      return tf.losses.softmaxCrossEntropy(labels, logitsFlat);
+    }, true, varList);
+
+    lastLoss = (await lossT.data())[0];
+    lossT.dispose(); x.dispose(); y.dispose(); pos.dispose();
+
+    if (step % 10 === 0 || step === steps - 1) {
+      const elapsed = (performance.now() - t0) / 1000;
+      postProgress({
+        step: step + 1, total: steps, loss: lastLoss,
+        stepsPerSec: (step + 1) / elapsed,
+        numTensors: tf.memory().numTensors,
+        numBytes: tf.memory().numBytes,
+        backend: S.backend,
+      });
+      await new Promise(r => setTimeout(r, 0));
+    } else {
+      await new Promise(r => setTimeout(r, 0));
+    }
+  }
+  S.training.active = false;
+  return { loss: lastLoss, steps: steps };
+}
+
+async function generate({ prompt, maxTokens, temperature }, postToken) {
+  if (!S.model) throw new Error('No model loaded');
+  const { model, chars, stoi, blockSize } = S;
+  const filtered = Array.from(prompt, c => stoi.get(c)).filter(t => t !== undefined);
+  let tokens = filtered.length > 0 ? filtered : [stoi.get(' ') ?? 0];
+
+  const positions = tf.tensor2d(
+    [Array.from({ length: blockSize }, (_, i) => i)],
+    [1, blockSize], 'int32'
+  );
+
+  for (let i = 0; i < maxTokens; i++) {
+    let input;
+    if (tokens.length >= blockSize) input = tokens.slice(-blockSize);
+    else input = new Array(blockSize - tokens.length).fill(0).concat(tokens);
+
+    const next = tf.tidy(() => {
+      const x = tf.tensor2d([input], [1, blockSize], 'int32');
+      const logits = model.apply([x, positions]);
+      const last = logits.slice([0, blockSize - 1, 0], [1, 1, chars.length]);
+      const scaled = last.reshape([1, chars.length]).div(Math.max(temperature, 0.01));
+      return tf.multinomial(scaled, 1);
+    });
+    const tok = next.dataSync()[0];
+    next.dispose();
+    tokens.push(tok);
+    postToken(chars[tok]);
+    if (i % 5 === 0) await new Promise(r => setTimeout(r, 0));
+  }
+  positions.dispose();
+}
+
+async function saveModel(name) {
+  if (!S.model) throw new Error('No model to save');
+  await S.model.save('indexeddb://' + name);
+  localStorage.setItem('tok:' + name, JSON.stringify({ chars: S.chars, blockSize: S.blockSize }));
+}
+
+async function loadModel(name) {
+  const meta = JSON.parse(localStorage.getItem('tok:' + name) || 'null');
+  if (!meta) throw new Error('Tokenizer metadata missing for ' + name);
+  S.chars = meta.chars; S.stoi = new Map(meta.chars.map((c, i) => [c, i]));
+  S.blockSize = meta.blockSize; S.vocabSize = meta.chars.length;
+  S.model = await tf.loadLayersModel('indexeddb://' + name);
+}
+
+async function listModels() {
+  const all = await tf.io.listModels();
+  const out = [];
+  for (const k of Object.keys(all)) {
+    if (!k.startsWith('indexeddb://')) continue;
+    const name = k.slice('indexeddb://'.length);
+    out.push({ name, date: all[k].dateSaved });
+  }
+  return out;
+}
+
+async function deleteModel(name) {
+  await tf.io.removeModel('indexeddb://' + name);
+  localStorage.removeItem('tok:' + name);
+}
+
+/* ---- message protocol ---- */
+self.onmessage = async (e) => {
+  const { id, type, payload } = e.data;
+  try {
+    if (type === 'init') {
+      const backend = await initBackend();
+      self.postMessage({ id, type: 'done', payload: { backend } });
+    } else if (type === 'train') {
+      const res = await train(payload, p =>
+        self.postMessage({ id, type: 'progress', payload: p }));
+      self.postMessage({ id, type: 'done', payload: res });
+    } else if (type === 'pause') {
+      S.training.paused = true;
+      self.postMessage({ id, type: 'done', payload: {} });
+    } else if (type === 'resume') {
+      S.training.paused = false;
+      self.postMessage({ id, type: 'done', payload: {} });
+    } else if (type === 'stop') {
+      S.training.stopped = true;
+      self.postMessage({ id, type: 'done', payload: {} });
+    } else if (type === 'generate') {
+      await generate(payload, t =>
+        self.postMessage({ id, type: 'token', payload: t }));
+      self.postMessage({ id, type: 'done', payload: {} });
+    } else if (type === 'save') {
+      await saveModel(payload.name);
+      self.postMessage({ id, type: 'done', payload: {} });
+    } else if (type === 'load') {
+      await loadModel(payload.name);
+      self.postMessage({ id, type: 'done', payload: {} });
+    } else if (type === 'list') {
+      const models = await listModels();
+      self.postMessage({ id, type: 'done', payload: { models } });
+    } else if (type === 'delete') {
+      await deleteModel(payload.name);
+      self.postMessage({ id, type: 'done', payload: {} });
+    } else {
+      throw new Error('Unknown message type: ' + type);
+    }
+  } catch (err) {
+    self.postMessage({ id, type: 'error', payload: err.message || String(err) });
+  }
+};
+`;
+
+/* ---------------- main-thread state ---------------- */
+const APP = {
+  worker: null,
+  messageId: 0,
+  pending: new Map(),
+  currentText: '',
+  hasModel: false,
+  backend: null,
+  lossHistory: [],
+  training: false,
+  generating: false,
+};
+
+function ensureWorker() {
+  if (APP.worker) return Promise.resolve();
+  const blob = new Blob([WORKER_SRC], { type: 'application/javascript' });
+  const url = URL.createObjectURL(blob);
+  APP.worker = new Worker(url, { type: 'module' });
+  APP.worker.onmessage = (e) => {
+    const { id, type, payload } = e.data;
+    const p = APP.pending.get(id);
+    if (!p) return;
+    if (type === 'progress' && p.onProgress) { p.onProgress(payload); return; }
+    if (type === 'token' && p.onToken) { p.onToken(payload); return; }
+    APP.pending.delete(id);
+    if (type === 'error') p.reject(new Error(payload));
+    else p.resolve(payload);
+  };
+  APP.worker.onerror = (e) => {
+    console.error('Worker error:', e);
+    setTrainStatus('Worker error: ' + (e.message || 'unknown'), 'error');
+  };
+  return callWorker('init', {}).then(res => {
+    APP.backend = res.backend;
+    updateModelEstimate();
+    return res;
+  });
+}
+
+function callWorker(type, payload, callbacks) {
+  return new Promise((resolve, reject) => {
+    const id = ++APP.messageId;
+    APP.pending.set(id, { resolve, reject, ...(callbacks || {}) });
+    APP.worker.postMessage({ id, type, payload });
+  });
+}
+
+/* ---------------- UI helpers ---------------- */
+function setTrainStatus(text, cls) {
+  const el = $('#train-status');
+  el.textContent = text;
+  el.className = 'status ' + (cls || '');
+}
+
+function updateDatasetStats() {
+  const text = APP.currentText;
+  const el = $('#dataset-stats');
+  if (!text) { el.textContent = ''; el.className = 'stats'; return; }
+  const chars = new Set(text).size;
+  const minBlock = +$('#blockSize').value;
+  const ok = text.length >= minBlock * 4 && chars >= 2;
+  el.textContent = text.length.toLocaleString() + ' chars · ' + chars + ' unique · ' +
+    (ok ? 'ready' : 'need ≥' + (minBlock * 4) + ' chars and 2+ unique chars');
+  el.className = 'stats ' + (ok ? '' : 'warn');
+}
+
+function updateModelEstimate() {
+  const nLayer = +$('#nLayer').value;
+  const nHead = +$('#nHead').value;
+  const nEmbed = +$('#nEmbed').value;
+  const blockSize = +$('#blockSize').value;
+  const vocabSize = APP.currentText ? new Set(APP.currentText).size : 64;
+
+  if (nEmbed % nHead !== 0) {
+    $('#model-estimate').textContent = 'embed dim must be divisible by heads (' + nEmbed + ' % ' + nHead + ')';
+    $('#model-estimate').className = 'stats error';
+    return;
+  }
+
+  const perLayer = 12 * nEmbed * nEmbed + 10 * nEmbed;
+  const params = vocabSize * nEmbed + blockSize * nEmbed + nLayer * perLayer + 2 * nEmbed + vocabSize * nEmbed;
+  const weightMB = params * 4 / 1048576;
+  const trainMB = params * 12 / 1048576;
+  let text = params.toLocaleString() + ' params · ' +
+    weightMB.toFixed(1) + ' MB weights · ' +
+    trainMB.toFixed(1) + ' MB training memory';
+  if (APP.backend) text += ' · ' + APP.backend;
+  $('#model-estimate').textContent = text;
+  $('#model-estimate').className = 'stats' + (trainMB > 500 ? ' warn' : '');
+}
+
+function drawLossChart() {
+  const canvas = $('#loss-chart');
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = 180 * dpr;
+  ctx.scale(dpr, dpr);
+  const W = rect.width, H = 180;
+  ctx.clearRect(0, 0, W, H);
+
+  const h = APP.lossHistory;
+  if (h.length < 2) {
+    ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--text-dim').trim();
+    ctx.font = '12px ' + getComputedStyle(document.body).getPropertyValue('--mono');
+    ctx.textAlign = 'center';
+    ctx.fillText('loss will appear here during training', W / 2, H / 2);
+    return;
+  }
+
+  const pad = 24;
+  const minLoss = Math.min(...h.map(x => x.loss));
+  const maxLoss = Math.max(...h.map(x => x.loss));
+  const range = maxLoss - minLoss || 1;
+  const style = getComputedStyle(document.body);
+  const accent = style.getPropertyValue('--accent').trim();
+  const dim = style.getPropertyValue('--text-dim').trim();
+
+  ctx.strokeStyle = dim;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(pad, pad);
+  ctx.lineTo(pad, H - pad);
+  ctx.lineTo(W - pad, H - pad);
+  ctx.stroke();
+
+  ctx.strokeStyle = accent;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  h.forEach((pt, i) => {
+    const x = pad + (i / (h.length - 1)) * (W - 2 * pad);
+    const y = (H - pad) - ((pt.loss - minLoss) / range) * (H - 2 * pad);
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+
+  ctx.fillStyle = dim;
+  ctx.font = '11px ' + style.getPropertyValue('--mono');
+  ctx.textAlign = 'left';
+  ctx.fillText(maxLoss.toFixed(3), pad + 4, pad + 10);
+  ctx.fillText(minLoss.toFixed(3), pad + 4, H - pad - 4);
+}
+
+function addMessage(role, text) {
+  const log = $('#chat-log');
+  const div = document.createElement('div');
+  div.className = 'message ' + role;
+  div.textContent = text;
+  if (role === 'assistant') div.dataset.streaming = 'true';
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+  return div;
+}
+
+function appendToken(text) {
+  const log = $('#chat-log');
+  let last = log.lastElementChild;
+  if (!last || last.dataset.streaming !== 'true') {
+    last = addMessage('assistant', '');
+  }
+  last.textContent += text;
+  log.scrollTop = log.scrollHeight;
+}
+
+function finishStreaming() {
+  $$('#chat-log .message[data-streaming="true"]').forEach(el => {
+    delete el.dataset.streaming;
+  });
+}
+
+/* ---------------- dataset sources ---------------- */
+function setDataset(text) {
+  APP.currentText = text;
+  updateDatasetStats();
+  updateModelEstimate();
+}
+
+async function fetchDatasetURL(url) {
+  setTrainStatus('Fetching…', 'running');
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(30000) });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const text = await res.text();
+    setDataset(text);
+    setTrainStatus('Fetched ' + text.length.toLocaleString() + ' chars', 'complete');
+  } catch (err) {
+    if (err.name === 'TypeError' || /Failed to fetch/i.test(err.message)) {
+      setTrainStatus('CORS/network blocked. Download the file and use Upload instead.', 'error');
+    } else {
+      setTrainStatus('Fetch failed: ' + err.message, 'error');
+    }
+  }
+}
+
+/* ---------------- saved models ---------------- */
+async function refreshSavedModels() {
+  if (!APP.worker) return;
+  try {
+    const res = await callWorker('list', {});
+    const container = $('#saved-models');
+    if (!res.models.length) {
+      container.innerHTML = '<span class="hint">No saved models yet.</span>';
+      return;
+    }
+    container.innerHTML = '';
+    res.models.forEach(m => {
+      const row = document.createElement('div');
+      row.className = 'model-row';
+      const name = document.createElement('span');
+      name.className = 'name'; name.textContent = m.name;
+      const date = document.createElement('span');
+      date.className = 'date';
+      date.textContent = new Date(m.date).toLocaleString();
+      const load = document.createElement('button');
+      load.textContent = 'Load';
+      load.onclick = async () => {
+        try {
+          await callWorker('load', { name: m.name });
+          APP.hasModel = true;
+          setTrainStatus('Loaded ' + m.name, 'complete');
+          enableChat();
+        } catch (e) { setTrainStatus('Load failed: ' + e.message, 'error'); }
+      };
+      const del = document.createElement('button');
+      del.className = 'danger';
+      del.textContent = 'Delete';
+      del.onclick = async () => {
+        if (!confirm('Delete model "' + m.name + '"?')) return;
+        try {
+          await callWorker('delete', { name: m.name });
+          refreshSavedModels();
+        } catch (e) { setTrainStatus('Delete failed: ' + e.message, 'error'); }
+      };
+      row.append(name, date, load, del);
+      container.appendChild(row);
+    });
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+/* ---------------- chat enabling ---------------- */
+function enableChat() {
+  $('#chat-input').disabled = false;
+  $('#send-btn').disabled = false;
+  const log = $('#chat-log');
+  if (log.firstElementChild && log.firstElementChild.classList.contains('system')) {
+    log.firstElementChild.textContent = 'Model ready. Type a prompt.';
+  }
+}
+
+/* ---------------- tab switching ---------------- */
+function switchTab(name) {
+  $$('header nav button').forEach(b => {
+    b.setAttribute('aria-selected', b.dataset.tab === name ? 'true' : 'false');
+  });
+  $('#panel-train').hidden = name !== 'train';
+  $('#panel-chat').hidden = name !== 'chat';
+  if (name === 'chat' && APP.hasModel) enableChat();
+}
+
+/* ---------------- wire up ---------------- */
+document.addEventListener('DOMContentLoaded', () => {
+  // tabs
+  $$('header nav button').forEach(b => {
+    b.addEventListener('click', () => switchTab(b.dataset.tab));
+  });
+
+  // source tabs
+  $$('.source-tabs button').forEach(b => {
+    b.addEventListener('click', () => {
+      $$('.source-tabs button').forEach(x => x.setAttribute('aria-selected', 'false'));
+      b.setAttribute('aria-selected', 'true');
+      $$('.source-panel').forEach(p => {
+        p.hidden = p.dataset.sourcePanel !== b.dataset.source;
+      });
+    });
+  });
+
+  // dataset text
+  let pasteTimer;
+  $('#dataset-text').addEventListener('input', e => {
+    clearTimeout(pasteTimer);
+    pasteTimer = setTimeout(() => setDataset(e.target.value), 200);
+  });
+
+  // dataset file
+  $('#dataset-file').addEventListener('change', e => {
+    const f = e.target.files[0];
+    if (!f) return;
+    const r = new FileReader();
+    r.onload = () => {
+      const text = r.result;
+      setDataset(text);
+      setTrainStatus('Loaded ' + f.name + ' (' + text.length.toLocaleString() + ' chars)', 'complete');
+    };
+    r.readAsText(f);
+  });
+
+  // dataset url
+  $('#fetch-url').addEventListener('click', () => {
+    const url = $('#dataset-url').value.trim();
+    if (!url) return;
+    fetchDatasetURL(url);
+  });
+
+  // model sliders
+  ['nLayer', 'nHead', 'nEmbed', 'blockSize', 'batchSize'].forEach(id => {
+    const input = $('#' + id);
+    const out = input.nextElementSibling;
+    const sync = () => { out.textContent = input.value; updateModelEstimate(); updateDatasetStats(); };
+    input.addEventListener('input', sync);
+    sync();
+  });
+
+  // temperature output
+  const temp = $('#temperature');
+  temp.addEventListener('input', () => { temp.nextElementSibling.textContent = temp.value; });
+
+  // start training
+  $('#start-train').addEventListener('click', async () => {
+    if (!APP.currentText) { setTrainStatus('Provide a dataset first', 'error'); return; }
+    if (APP.training) return;
+
+    const nEmbed = +$('#nEmbed').value;
+    const nHead = +$('#nHead').value;
+    if (nEmbed % nHead !== 0) {
+      setTrainStatus('Embed dim must be divisible by heads', 'error');
+      return;
+    }
+
+    setTrainStatus('Initializing worker…', 'running');
+    try {
+      await ensureWorker();
+    } catch (e) {
+      setTrainStatus('Worker init failed: ' + e.message, 'error');
+      return;
+    }
+
+    APP.lossHistory = [];
+    APP.training = true;
+    $('#start-train').disabled = true;
+    $('#pause-train').hidden = false;
+    $('#pause-train').textContent = 'Pause';
+    $('#stop-train').hidden = false;
+    setTrainStatus('Training…', 'running');
+
+    try {
+      await callWorker('train', {
+        text: APP.currentText,
+        blockSize: +$('#blockSize').value,
+        batchSize: +$('#batchSize').value,
+        nEmbed,
+        nHead,
+        nLayer: +$('#nLayer').value,
+        steps: +$('#steps').value,
+        lr: +$('#lr').value,
+      }, {
+        onProgress: p => {
+          APP.lossHistory.push({ step: p.step, loss: p.loss });
+          setTrainStatus(
+            'step ' + p.step + '/' + p.total +
+            ' · loss ' + p.loss.toFixed(4) +
+            ' · ' + p.stepsPerSec.toFixed(1) + ' steps/s' +
+            ' · ' + p.backend +
+            ' · ' + p.numTensors + ' tensors',
+            'running'
+          );
+          drawLossChart();
+        }
+      });
+      APP.hasModel = true;
+      $('#save-model').disabled = false;
+      enableChat();
+      setTrainStatus('Training complete. Model ready.', 'complete');
+    } catch (e) {
+      setTrainStatus('Training failed: ' + e.message, 'error');
+    } finally {
+      APP.training = false;
+      $('#start-train').disabled = false;
+      $('#pause-train').hidden = true;
+      $('#stop-train').hidden = true;
+    }
+  });
+
+  // pause / resume
+  $('#pause-train').addEventListener('click', async () => {
+    const btn = $('#pause-train');
+    if (btn.textContent === 'Pause') {
+      await callWorker('pause', {});
+      btn.textContent = 'Resume';
+      setTrainStatus('Paused', '');
+    } else {
+      await callWorker('resume', {});
+      btn.textContent = 'Pause';
+      setTrainStatus('Training…', 'running');
+    }
+  });
+
+  // stop
+  $('#stop-train').addEventListener('click', async () => {
+    await callWorker('stop', {});
+    setTrainStatus('Stopping…', '');
+  });
+
+  // save model
+  $('#save-model').addEventListener('click', async () => {
+    const name = $('#save-name').value.trim() || 'model-' + Date.now();
+    try {
+      await callWorker('save', { name });
+      setTrainStatus('Saved as "' + name + '"', 'complete');
+      refreshSavedModels();
+    } catch (e) {
+      setTrainStatus('Save failed: ' + e.message, 'error');
+    }
+  });
+
+  // chat submit
+  $('#chat-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (APP.generating) return;
+    const prompt = $('#chat-input').value.trim();
+    if (!prompt) return;
+    $('#chat-input').value = '';
+    addMessage('user', prompt);
+    APP.generating = true;
+    $('#send-btn').disabled = true;
+    try {
+      await callWorker('generate', {
+        prompt,
+        maxTokens: +$('#maxTokens').value,
+        temperature: +$('#temperature').value,
+      }, {
+        onToken: t => appendToken(t)
+      });
+    } catch (err) {
+      addMessage('system', 'Error: ' + err.message);
+    } finally {
+      finishStreaming();
+      APP.generating = false;
+      $('#send-btn').disabled = false;
+    }
+  });
+
+  // clear chat
+  $('#clear-chat').addEventListener('click', () => {
+    const log = $('#chat-log');
+    log.innerHTML = '';
+    if (!APP.hasModel) {
+      const div = document.createElement('div');
+      div.className = 'message system';
+      div.textContent = 'Train or load a model first, then send a prompt.';
+      log.appendChild(div);
+    }
+  });
+
+  // initial render
+  drawLossChart();
+  window.addEventListener('resize', drawLossChart);
+  updateDatasetStats();
+  updateModelEstimate();
+});
+</script>
+</body>
+</html>
